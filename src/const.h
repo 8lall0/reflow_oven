@@ -34,8 +34,8 @@
 #define SSR_TWO 12
 
 // Rotary encoder
-#define ENC_ROT_A 2
+#define ENC_ROT_A 4
 #define ENC_ROT_B 3
-#define ENC_ROT_BTN 4
+#define ENC_ROT_BTN 2
 
 #endif //CONST_H

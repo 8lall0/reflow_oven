@@ -41,7 +41,7 @@ unsigned long processStart = 0;
 unsigned long phaseStart = 0;
 int phase = PHASE_IDLE;
 
-int buttonState = 0;
+volatile byte buttonReleased = false;
 
 void startReflow() {
     processStart = millis();
@@ -59,10 +59,12 @@ void haltReflow() {
     phase = PHASE_IDLE;
 }
 
+void buttonCallback() {
+    buttonReleased = true;
+}
+
 void setup() {
-    if (DEBUG) {
-        Serial.begin(9600);
-    }
+    Serial.begin(9600);
     thermo.begin(MAX31865_3WIRE);
     pinMode(SSR_PIN, OUTPUT);
     digitalWrite(SSR_PIN, LOW);
@@ -72,23 +74,27 @@ void setup() {
     myPID.SetMode(AUTOMATIC);
 
     lcd.begin(LCD_WIDTH, LCD_HEIGHT);
+    pinMode(ENC_ROT_BTN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(ENC_ROT_BTN),
+                    buttonCallback,
+                    FALLING);
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Ready");
+    lcd.print("Loading...");
+    Serial.println("Ready");
     delay(1000);
-    pinMode(ENC_ROT_BTN, INPUT);
 }
 
 void loop() {
-    buttonState = digitalRead(ENC_ROT_BTN);
-    if (buttonState == HIGH) {
+    if (buttonReleased) {
+        buttonReleased = false;
         if (phase == PHASE_IDLE) {
             startReflow();
         } else {
             haltReflow();
         }
+        delay(1000);
     }
-
     temperature = thermo.temperature(RNOMINAL, RREF);
     if (isnan(temperature)) {
         lcd.clear();
@@ -165,7 +171,6 @@ void loop() {
             }
             setPoint = T_REFLOW_PEAK - (T_REFLOW_PEAK - T_COOL_END) * (
                            static_cast<double>(elapsedPhase) / static_cast<double>(DURATION_COOL));
-            lcd.setCursor(0, 0);
             lcd.print("Cooling       ");
             break;
         }
@@ -182,7 +187,6 @@ void loop() {
             }
             setPoint = T_REFLOW_PEAK - (T_REFLOW_PEAK - T_COOL_END) * (
                            static_cast<double>(elapsedPhase) / static_cast<double>(DURATION_COOL));
-            lcd.setCursor(0, 0);
             lcd.print("Halting       ");
             break;
         }
@@ -199,13 +203,15 @@ void loop() {
         }
     }
 
-    myPID.Compute();
-
-    if (output > static_cast<double>((millis() - phaseStart) % 2000)) {
-        digitalWrite(SSR_PIN, HIGH);
-    } else {
-        digitalWrite(SSR_PIN, LOW);
+    if (phase != PHASE_IDLE) {
+        myPID.Compute();
+        if (output > static_cast<double>((millis() - phaseStart) % 2000)) {
+            digitalWrite(SSR_PIN, HIGH);
+        } else {
+            digitalWrite(SSR_PIN, LOW);
+        }
     }
+
 
     // Display
     lcd.setCursor(0, 1);
@@ -215,16 +221,15 @@ void loop() {
     lcd.print(setPoint, 1);
     lcd.print(" ");
 
-    if (DEBUG) {
-        Serial.print("Phase: ");
-        Serial.print(phase);
-        Serial.print(" | Temp: ");
-        Serial.print(temperature);
-        Serial.print(" | SetPoint: ");
-        Serial.print(setPoint);
-        Serial.print(" | Output: ");
-        Serial.println(output);
-    }
+
+    Serial.print("Phase: ");
+    Serial.print(phase);
+    Serial.print(" | Temp: ");
+    Serial.print(temperature);
+    Serial.print(" | SetPoint: ");
+    Serial.print(setPoint);
+    Serial.print(" | Output: ");
+    Serial.println(output);
 
     delay(100);
 }
