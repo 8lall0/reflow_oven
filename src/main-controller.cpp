@@ -4,64 +4,45 @@
 #include <Wire.h>
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_I2Cexp.h>
+#include <ClickEncoder.h>
+#include <TimerOne.h>
 
-// Replace these with your actual hardware pins and constants
 #include "const.h"
 
-// SSR control pin
-#define SSR_PIN SSR_ONE
-
-// Phase durations (ms)
-#define DURATION_PREHEAT 90000
-#define DURATION_SOAK    90000
-#define DURATION_REFLOW  30000
-#define DURATION_DWELL   15000
-#define DURATION_COOL    60000
-
-// Temperature targets
-#define T_ROOM   25.0
-#define T_PREHEAT_END 150.0
-#define T_SOAK_END    180.0
-#define T_REFLOW_PEAK 245.0
-#define T_COOL_END     50.0
-
-// PID settings (tune as needed)
-#define PID_SAMPLE_TIME 1000
-#define KP 300
-#define KI 0.1
-#define KD 200
 
 hd44780_I2Cexp lcd;
 auto thermo = Adafruit_MAX31865(THERMO_CS, THERMO_MOSI, THERMO_MISO, THERMO_CLK);
-
 double temperature, output, setPoint;
 PID myPID(&temperature, &output, &setPoint, KP, KI, KD, DIRECT);
+ClickEncoder encoder(ENC_ROT_CLK, ENC_ROT_DT, ENC_ROT_BTN, 4);
 
 unsigned long processStart = 0;
 unsigned long phaseStart = 0;
 int phase = PHASE_IDLE;
 
-volatile byte buttonReleased = false;
+void startReflow();
 
-void startReflow() {
-    processStart = millis();
-    phaseStart = processStart;
-    phase = PHASE_PREHEAT;
-    lcd.clear();
-    lcd.home();
-    lcd.print("Reflow started");
-    if (DEBUG) {
-        Serial.println("Reflow process started.");
-    }
-}
+void haltReflow();
 
-void haltReflow() {
-    phase = PHASE_IDLE;
-}
+void readEncoder();
 
-void buttonCallback() {
-    buttonReleased = true;
-}
+void printMenu();
+
+void timerIsr();
+
+int menuIndex = 0;
+
+int16_t oldEncPos, encPos;
+uint8_t buttonState;
+
+bool isAbout = false;
+// Menu items
+constexpr int menuLength = 3;
+String menuItems[menuLength] = {
+    "Start reflow",
+    "Bake",
+    "About",
+};
 
 void setup() {
     Serial.begin(9600);
@@ -74,10 +55,11 @@ void setup() {
     myPID.SetMode(AUTOMATIC);
 
     lcd.begin(LCD_WIDTH, LCD_HEIGHT);
-    pinMode(ENC_ROT_BTN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(ENC_ROT_BTN),
-                    buttonCallback,
-                    FALLING);
+    Timer1.initialize(1000);
+    Timer1.attachInterrupt(timerIsr);
+    oldEncPos = -1;
+    encPos = -1;
+    encoder.setAccelerationEnabled(false);
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Loading...");
@@ -86,29 +68,84 @@ void setup() {
 }
 
 void loop() {
-    if (buttonReleased) {
-        buttonReleased = false;
-        if (phase == PHASE_IDLE) {
-            startReflow();
-        } else {
-            haltReflow();
+    readEncoder();
+    buttonState = encoder.getButton();
+
+    if (buttonState != 0) {
+        switch (buttonState) {
+            case ClickEncoder::Open: //0
+                break;
+
+            case ClickEncoder::Closed: //1
+                break;
+
+            case ClickEncoder::Pressed: //2
+                break;
+
+            case ClickEncoder::Held: //3
+                break;
+
+            case ClickEncoder::Released: //4
+                break;
+
+            case ClickEncoder::Clicked: //5
+                switch (menuIndex) {
+                    case 0: {
+                        if (phase != PHASE_IDLE) {
+                            haltReflow();
+                        } else if (phase == PHASE_IDLE) {
+                            startReflow();
+                        }
+                        break;
+                    }
+
+                    case 1: {
+                        if (phase == PHASE_IDLE) {
+                            phase = PHASE_BAKE;
+                        } else {
+                            phase = PHASE_IDLE;
+                        }
+                        break;
+                    }
+                    case 2: {
+                        if (!isAbout) {
+                            lcd.clear();
+                            lcd.setCursor(0, 0);
+                            lcd.print("Reflowduino v1.0");
+                            lcd.setCursor(0, 1);
+                            lcd.print("Written by 8lall0");
+                            isAbout = true;
+                        } else {
+                            phase = PHASE_IDLE;
+                            isAbout = false;
+                        }
+
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                break;
+
+            case ClickEncoder::DoubleClicked: //6
+                break;
         }
-        delay(1000);
+    }
+
+    if (phase == PHASE_IDLE) {
+        printMenu();
     }
     temperature = thermo.temperature(RNOMINAL, RREF);
     if (isnan(temperature)) {
         lcd.clear();
         lcd.print("Thermocouple error");
-        if (DEBUG) {
-            Serial.println("Thermocouple error");
-        }
+        Serial.println("Thermocouple error");
         return;
     }
 
     const unsigned long now = millis();
     const unsigned long elapsedPhase = now - phaseStart;
 
-    // Determine setPoint based on current phase
     lcd.setCursor(0, 0);
     switch (phase) {
         case PHASE_PREHEAT: {
@@ -174,30 +211,29 @@ void loop() {
             lcd.print("Cooling       ");
             break;
         }
-        case PHASE_HALT: {
-            if (elapsedPhase >= DURATION_COOL) {
+        case PHASE_BAKE: {
+            if (elapsedPhase >= DURATION_BAKE) {
                 phase = PHASE_IDLE;
                 digitalWrite(SSR_PIN, LOW);
-                lcd.print("Halt complete ");
+                lcd.print("Bake complete ");
                 if (DEBUG) {
-                    Serial.println("Halt complete.");
+                    Serial.println("Bake complete.");
                 }
                 delay(1000);
                 break;
             }
-            setPoint = T_REFLOW_PEAK - (T_REFLOW_PEAK - T_COOL_END) * (
-                           static_cast<double>(elapsedPhase) / static_cast<double>(DURATION_COOL));
-            lcd.print("Halting       ");
+            lcd.print("Baking       ");
+            setPoint = T_BAKE;
             break;
         }
         case PHASE_DONE: {
             lcd.setCursor(0, 0);
             lcd.print("Done       ");
+            delay(3000);
+            phase = PHASE_IDLE;
         }
         case PHASE_IDLE:
         default: {
-            lcd.clear();
-            lcd.print("Reflowduino");
             digitalWrite(SSR_PIN, LOW);
             break;
         }
@@ -212,15 +248,15 @@ void loop() {
         }
     }
 
-
-    // Display
-    lcd.setCursor(0, 1);
-    lcd.print("T:");
-    lcd.print(temperature, 1);
-    lcd.print("C S:");
-    lcd.print(setPoint, 1);
-    lcd.print(" ");
-
+    if (phase != PHASE_IDLE) {
+        // Display
+        lcd.setCursor(0, 1);
+        lcd.print("T:");
+        lcd.print(temperature, 1);
+        lcd.print("C S:");
+        lcd.print(setPoint, 1);
+        lcd.print(" ");
+    }
 
     Serial.print("Phase: ");
     Serial.print(phase);
@@ -232,4 +268,48 @@ void loop() {
     Serial.println(output);
 
     delay(100);
+}
+
+void printMenu() {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Reflowduino ");
+    lcd.print(VERSION);
+    lcd.setCursor(0, 1);
+    lcd.print("> ");
+    lcd.print(menuItems[menuIndex]);
+}
+
+void startReflow() {
+    lcd.clear();
+    lcd.home();
+    lcd.print("Reflow started");
+    Serial.println("Reflow process started.");
+    delay(2000);
+    processStart = millis();
+    phaseStart = processStart;
+    phase = PHASE_PREHEAT;
+}
+
+void haltReflow() {
+    phase = PHASE_IDLE;
+}
+
+void readEncoder() {
+    if (phase != PHASE_IDLE) {
+        return;
+    }
+    encPos += encoder.getValue();
+
+    if (encPos > oldEncPos) {
+        menuIndex++;
+    } else if (encPos < oldEncPos) {
+        menuIndex--;
+    }
+    oldEncPos = encPos;
+    menuIndex = constrain(menuIndex, 0, menuLength - 1);
+}
+
+void timerIsr() {
+    encoder.service();
 }
