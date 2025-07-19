@@ -35,7 +35,6 @@ int menuIndex = 0;
 int16_t oldEncPos, encPos;
 uint8_t buttonState;
 
-bool isAbout = false;
 // Menu items
 constexpr int menuLength = 3;
 String menuItems[menuLength] = {
@@ -108,18 +107,14 @@ void loop() {
                         break;
                     }
                     case 2: {
-                        if (!isAbout) {
-                            lcd.clear();
-                            lcd.setCursor(0, 0);
-                            lcd.print("Reflowduino v1.0");
-                            lcd.setCursor(0, 1);
-                            lcd.print("Written by 8lall0");
-                            isAbout = true;
-                        } else {
-                            phase = PHASE_IDLE;
-                            isAbout = false;
-                        }
-
+                        lcd.clear();
+                        lcd.setCursor(0, 0);
+                        lcd.print("Reflowduino ");
+                        lcd.print(VERSION);
+                        lcd.setCursor(0, 1);
+                        lcd.print("By 8lall0");
+                        delay(5000);
+                        lcd.clear();
                         break;
                     }
                     default:
@@ -157,7 +152,7 @@ void loop() {
             }
             setPoint = T_ROOM + (T_PREHEAT_END - T_ROOM) * (
                            static_cast<double>(elapsedPhase) / static_cast<double>(DURATION_PREHEAT));
-            lcd.print("Preheat       ");
+            lcd.print("Preheat");
             break;
         }
         case PHASE_SOAK: {
@@ -169,7 +164,7 @@ void loop() {
             }
             setPoint = T_PREHEAT_END + (T_SOAK_END - T_PREHEAT_END) * (
                            static_cast<double>(elapsedPhase) / static_cast<double>(DURATION_SOAK));
-            lcd.print("Soak          ");
+            lcd.print("Soak  ");
             break;
         }
         case PHASE_REFLOW: {
@@ -181,7 +176,7 @@ void loop() {
             }
             setPoint = T_SOAK_END + (T_REFLOW_PEAK - T_SOAK_END) * (
                            static_cast<double>(elapsedPhase) / static_cast<double>(DURATION_REFLOW));
-            lcd.print("Reflow        ");
+            lcd.print("Reflow");
             break;
         }
         case PHASE_DWELL: {
@@ -192,7 +187,7 @@ void loop() {
                 break;
             }
             setPoint = T_REFLOW_PEAK;
-            lcd.print("Peak Dwell    ");
+            lcd.print("Peak Dwell");
             break;
         }
         case PHASE_COOL: {
@@ -208,27 +203,26 @@ void loop() {
             }
             setPoint = T_REFLOW_PEAK - (T_REFLOW_PEAK - T_COOL_END) * (
                            static_cast<double>(elapsedPhase) / static_cast<double>(DURATION_COOL));
-            lcd.print("Cooling       ");
+            lcd.print("Cooling   ");
             break;
         }
         case PHASE_BAKE: {
             if (elapsedPhase >= DURATION_BAKE) {
                 phase = PHASE_IDLE;
                 digitalWrite(SSR_PIN, LOW);
-                lcd.print("Bake complete ");
+                lcd.print("Bake complete");
                 if (DEBUG) {
                     Serial.println("Bake complete.");
                 }
                 delay(1000);
                 break;
             }
-            lcd.print("Baking       ");
+            lcd.print("Baking    ");
             setPoint = T_BAKE;
             break;
         }
         case PHASE_DONE: {
-            lcd.setCursor(0, 0);
-            lcd.print("Done       ");
+            lcd.print("Done");
             delay(3000);
             phase = PHASE_IDLE;
         }
