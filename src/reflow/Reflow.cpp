@@ -32,7 +32,7 @@
 #define RREF 430.0
 #define RNOMINAL 100.0
 
-Reflow::Reflow(const int pin, hd44780_I2Cexp *screen, Adafruit_MAX31865 *thermocouple): temperature(0), output(0),
+Reflow::Reflow(const int pin, hd44780_I2Cexp *screen, Adafruit_MAX31865 *thermocouple, ClickEncoder *encoder): temperature(0), output(0),
     setPoint(0), reflowPID(PID(&temperature, &output, &setPoint, KP, KI, KD, DIRECT)) {
     reflowPID.SetOutputLimits(0, 2000); // window size
     reflowPID.SetSampleTime(PID_SAMPLE_TIME);
@@ -41,10 +41,22 @@ Reflow::Reflow(const int pin, hd44780_I2Cexp *screen, Adafruit_MAX31865 *thermoc
     lcd = screen;
     thermo = thermocouple;
     phase = PHASE_IDLE;
+    this->encoder = encoder;
 }
 
-void Reflow::Stop() {
-    phase = PHASE_IDLE;
+void Reflow::stop() const {
+    lcd->clear();
+    lcd->setCursor(0, 0);
+    lcd->print("Stopping....");
+
+    while (temperature > 50.0) {
+        lcd->setCursor(0, 1);
+        lcd->print("T:");
+        lcd->print(temperature, 1);
+        lcd->print("C S:");
+        lcd->print(setPoint, 1);
+        lcd->print(" ");
+    }
 }
 
 void Reflow::Start() {
@@ -52,7 +64,14 @@ void Reflow::Start() {
 
     phase = PHASE_PREHEAT;
 
-    while (phase != PHASE_IDLE) {
+    while (true) {
+        const uint8_t buttonState = encoder->getButton();
+        if (buttonState == ClickEncoder::Clicked || phase == PHASE_IDLE) {
+            phase = PHASE_IDLE;
+            this->stop();
+            break;
+        }
+
         const unsigned long now = millis();
         const unsigned long elapsedPhase = now - phaseStart;
         temperature = thermo->temperature(RNOMINAL, RREF);
@@ -128,11 +147,11 @@ void Reflow::Start() {
                 digitalWrite(ssrPIN, LOW);
                 phase = PHASE_IDLE;
                 delay(3000);
-                return;
+                break;
             }
             default: {
                 phase = PHASE_IDLE;
-                return;
+                break;
             }
         }
         reflowPID.Compute();

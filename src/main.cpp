@@ -14,24 +14,21 @@
 
 hd44780_I2Cexp lcd;
 auto thermo = Adafruit_MAX31865(THERMO_CS, THERMO_MOSI, THERMO_MISO, THERMO_CLK);
-double temperature, output, setPoint;
-ClickEncoder encoder(ENC_ROT_CLK, ENC_ROT_DT, ENC_ROT_BTN, 4);
+auto encoder = ClickEncoder(ENC_ROT_CLK, ENC_ROT_DT, ENC_ROT_BTN, 4);
 
-auto reflow = Reflow(SSR_PIN, &lcd, &thermo);
-auto bake = Bake(SSR_PIN, &lcd, &thermo);
+auto reflow = Reflow(SSR_PIN, &lcd, &thermo, &encoder);
+auto bake = Bake(SSR_PIN, &lcd, &thermo, &encoder);
 
 void readEncoder();
+void timerIsr();
 
 void printMenu();
-
-void timerIsr();
+void printInfo();
 
 int menuIndex = 0;
 
 int16_t oldEncPos, encPos;
-uint8_t buttonState;
 
-// Menu items
 constexpr int menuLength = 3;
 String menuItems[menuLength] = {
     "Start reflow",
@@ -61,33 +58,20 @@ void setup() {
 void loop() {
     printMenu();
     readEncoder();
-    buttonState = encoder.getButton();
+    const uint8_t buttonState = encoder.getButton();
 
-    if (buttonState != 0 && buttonState == ClickEncoder::Clicked) {
+    if (buttonState == ClickEncoder::Clicked) {
         switch (menuIndex) {
             case 0: {
                 reflow.Start();
                 break;
             }
-
             case 1: {
-                if (bake.IsRunning()) {
-                    bake.Stop();
-                } else {
-                    bake.Start();
-                }
-
+                bake.Start();
                 break;
             }
             case 2: {
-                lcd.clear();
-                lcd.setCursor(0, 0);
-                lcd.print("Reflowduino ");
-                lcd.print(VERSION);
-                lcd.setCursor(0, 1);
-                lcd.print("By 8lall0");
-                delay(5000);
-                lcd.clear();
+                printInfo();
                 break;
             }
             default:
@@ -95,6 +79,20 @@ void loop() {
         }
     }
     delay(100);
+}
+
+void printInfo() {
+    uint8_t buttonState = encoder.getButton();
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Reflowduino ");
+    lcd.print(VERSION);
+    lcd.setCursor(0, 1);
+    lcd.print("By 8lall0");
+
+    while (buttonState != ClickEncoder::Clicked) {
+        buttonState = encoder.getButton();
+    }
 }
 
 void printMenu() {

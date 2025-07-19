@@ -6,13 +6,12 @@
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_I2Cexp.h>
 #include <Adafruit_MAX31865.h>
+#include <ClickEncoder.h>
 
 class Reflow {
 public:
-    explicit Reflow(int pin, hd44780_I2Cexp *screen, Adafruit_MAX31865 *thermocouple);
-
+    explicit Reflow(int pin, hd44780_I2Cexp *screen, Adafruit_MAX31865 *thermocouple, ClickEncoder *encoder);
     void Start();
-    void Stop();
 
 private:
     Adafruit_MAX31865 *thermo;
@@ -20,6 +19,9 @@ private:
     double temperature, output, setPoint;
     int phase = 0, ssrPIN;
     PID reflowPID;
+    ClickEncoder *encoder;
+
+    void stop() const;
 };
 
 #endif //REFLOW_H

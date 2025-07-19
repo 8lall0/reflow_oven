@@ -11,39 +11,58 @@
 
 #include "Bake.h"
 
-Bake::Bake(const int pin, hd44780_I2Cexp *screen, Adafruit_MAX31865 *thermocouple): temperature(0), output(0),
-    setPoint(0),
-    bakePID(&temperature, &output, &setPoint, KP, KI, KD, DIRECT) {
+Bake::Bake(const int pin, hd44780_I2Cexp *screen, Adafruit_MAX31865 *thermocouple,
+           ClickEncoder *encoder): temperature(0), output(0),
+                                   setPoint(0),
+                                   bakePID(&temperature, &output, &setPoint, KP, KI, KD, DIRECT) {
     ssrPIN = pin;
     lcd = screen;
     thermo = thermocouple;
+    this->encoder = encoder;
 }
 
-void Bake::Stop() {
-    isRunning = false;
-}
+void Bake::stop() const {
+    lcd->clear();
+    lcd->setCursor(0, 0);
+    lcd->print("Stopping....");
 
-bool Bake::IsRunning() const {
-    return isRunning;
+    while (temperature > 50.0) {
+        lcd->setCursor(0, 1);
+        lcd->print("T:");
+        lcd->print(temperature, 1);
+        lcd->print("C S:");
+        lcd->print(setPoint, 1);
+        lcd->print(" ");
+    }
 }
-
 
 void Bake::Start() {
-    isRunning = true;
     const unsigned long phaseStart = millis();
 
-    while (isRunning) {
+    while (true) {
+        const uint8_t buttonState = encoder->getButton();
+        if (buttonState == ClickEncoder::Clicked) {
+            this->stop();
+            break;
+        }
+
         lcd->setCursor(0, 0);
         const unsigned long elapsedPhase = millis() - phaseStart;
 
         if (elapsedPhase >= DURATION_BAKE) {
             digitalWrite(ssrPIN, LOW);
             lcd->print("Bake complete");
-            isRunning = false;
             delay(1000);
             break;
         }
         setPoint = T_BAKE;
+
+        bakePID.Compute();
+        if (output > static_cast<double>((millis() - phaseStart) % 2000)) {
+            digitalWrite(ssrPIN, HIGH);
+        } else {
+            digitalWrite(ssrPIN, LOW);
+        }
 
         lcd->print("Baking....");
 
@@ -53,12 +72,5 @@ void Bake::Start() {
         lcd->print("C S:");
         lcd->print(setPoint, 1);
         lcd->print(" ");
-
-        bakePID.Compute();
-        if (output > static_cast<double>((millis() - phaseStart) % 2000)) {
-            digitalWrite(ssrPIN, HIGH);
-        } else {
-            digitalWrite(ssrPIN, LOW);
-        }
     }
 }
