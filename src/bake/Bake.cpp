@@ -39,8 +39,8 @@ void Bake::Start() {
         if (elapsedPhase >= DURATION_BAKE) {
             digitalWrite(ssrPIN, LOW);
             lcd->print("Bake complete");
-            delay(1000);
             isRunning = false;
+            delay(1000);
             break;
         }
         setPoint = T_BAKE;

@@ -63,57 +63,33 @@ void loop() {
     readEncoder();
     buttonState = encoder.getButton();
 
-    if (buttonState != 0) {
-        switch (buttonState) {
-            case ClickEncoder::Open: //0
+    if (buttonState != 0 && buttonState == ClickEncoder::Clicked) {
+        switch (menuIndex) {
+            case 0: {
+                reflow.Start();
                 break;
+            }
 
-            case ClickEncoder::Closed: //1
-                break;
-
-            case ClickEncoder::Pressed: //2
-                break;
-
-            case ClickEncoder::Held: //3
-                break;
-
-            case ClickEncoder::Released: //4
-                break;
-
-            case ClickEncoder::Clicked: //5
-                switch (menuIndex) {
-                    case 0: {
-                        reflow.Start();
-                        break;
-                    }
-
-                    case 1: {
-                        if (bake.IsRunning()) {
-                            bake.Stop();
-                        } else {
-                            bake.Start();
-                        }
-
-                        break;
-                    }
-                    case 2: {
-                        lcd.clear();
-                        lcd.setCursor(0, 0);
-                        lcd.print("Reflowduino ");
-                        lcd.print(VERSION);
-                        lcd.setCursor(0, 1);
-                        lcd.print("By 8lall0");
-                        delay(5000);
-                        lcd.clear();
-                        break;
-                    }
-                    default:
-                        break;
+            case 1: {
+                if (bake.IsRunning()) {
+                    bake.Stop();
+                } else {
+                    bake.Start();
                 }
-                break;
 
-            case ClickEncoder::DoubleClicked: //6
                 break;
+            }
+            case 2: {
+                lcd.clear();
+                lcd.setCursor(0, 0);
+                lcd.print("Reflowduino ");
+                lcd.print(VERSION);
+                lcd.setCursor(0, 1);
+                lcd.print("By 8lall0");
+                delay(5000);
+                lcd.clear();
+                break;
+            }
             default:
                 break;
         }
