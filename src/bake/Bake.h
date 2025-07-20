@@ -17,12 +17,11 @@ public:
 private:
     Adafruit_MAX31865 *thermo;
     hd44780_I2Cexp *lcd;
-    double temperature, output, setPoint;
+    double temperature;
     int ssrPIN;
-    PID bakePID;
     ClickEncoder *encoder;
 
-    void stop() const;
+    void stop();
 };
 
 

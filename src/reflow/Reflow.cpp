@@ -67,6 +67,7 @@ void Reflow::Start() {
     while (true) {
         const uint8_t buttonState = encoder->getButton();
         if (buttonState == ClickEncoder::Clicked || phase == PHASE_IDLE) {
+            digitalWrite(ssrPIN, LOW);
             phase = PHASE_IDLE;
             this->stop();
             break;
@@ -167,5 +168,6 @@ void Reflow::Start() {
         lcd->print("C S:");
         lcd->print(setPoint, 1);
         lcd->print(" ");
+        delay(100);
     }
 }
