@@ -7,17 +7,16 @@
 #include <TimerOne.h>
 
 #include "reflow/Reflow.h"
-#include "bake/Bake.h"
+#include "heat/Heater.h"
 
 #include "const.h"
-
 
 hd44780_I2Cexp lcd;
 auto thermo = Adafruit_MAX31865(THERMO_CS, THERMO_MOSI, THERMO_MISO, THERMO_CLK);
 auto encoder = ClickEncoder(ENC_ROT_CLK, ENC_ROT_DT, ENC_ROT_BTN, 4);
 
 auto reflow = Reflow(SSR_PIN, &lcd, &thermo, &encoder);
-auto bake = Bake(SSR_PIN, &lcd, &thermo, &encoder);
+auto heat = Heater(SSR_PIN, &lcd, &thermo, &encoder);
 
 void readEncoder();
 void timerIsr();
@@ -32,7 +31,7 @@ int16_t oldEncPos, encPos;
 constexpr int menuLength = 3;
 String menuItems[menuLength] = {
     "Start reflow",
-    "Bake",
+    "Heat",
     "About",
 };
 
@@ -53,6 +52,7 @@ void setup() {
     lcd.print("Loading...");
     Serial.println("Ready");
     delay(1000);
+    lcd.clear();
 }
 
 void loop() {
@@ -67,7 +67,7 @@ void loop() {
                 break;
             }
             case 1: {
-                bake.Start();
+                heat.Start();
                 break;
             }
             case 2: {
@@ -77,6 +77,7 @@ void loop() {
             default:
                 break;
         }
+        lcd.clear();
     }
     delay(100);
 }
@@ -96,13 +97,14 @@ void printInfo() {
 }
 
 void printMenu() {
-    lcd.clear();
+    char buffer[16];
     lcd.setCursor(0, 0);
     lcd.print("Reflowduino ");
     lcd.print(VERSION);
     lcd.setCursor(0, 1);
     lcd.print("> ");
-    lcd.print(menuItems[menuIndex]);
+    sprintf(buffer, "%-14s", menuItems[menuIndex].c_str());
+    lcd.print(buffer);
 }
 
 void readEncoder() {
