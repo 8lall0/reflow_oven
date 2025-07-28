@@ -2,7 +2,7 @@
 #define CONST_H
 
 // Version
-#define VERSION "RC1"
+#define VERSION "RC2"
 
 // Pins
 #define THERMO_CS A0

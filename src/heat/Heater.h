@@ -1,6 +1,7 @@
 #ifndef HEAT_H
 #define HEAT_H
 
+#include <PID_v1.h>
 #include <Wire.h>
 #include <hd44780.h>
 #include <hd44780ioClass/hd44780_I2Cexp.h>
@@ -18,7 +19,9 @@ private:
     double temperature;
     int ssrPIN;
     ClickEncoder *encoder;
+    PID heatPID;
 
+    double output, setPoint;
     const int menuLength = 4;
     String menuItems[4] = {
         "Set Temp",

@@ -19,9 +19,11 @@ auto reflow = Reflow(SSR_PIN, &lcd, &thermo, &encoder);
 auto heat = Heater(SSR_PIN, &lcd, &thermo, &encoder);
 
 void readEncoder();
+
 void timerIsr();
 
 void printMenu();
+
 void printInfo();
 
 int menuIndex = 0;
@@ -83,16 +85,40 @@ void loop() {
 }
 
 void printInfo() {
-    uint8_t buttonState = encoder.getButton();
     lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Reflowduino ");
-    lcd.print(VERSION);
-    lcd.setCursor(0, 1);
-    lcd.print("By 8lall0");
 
-    while (buttonState != ClickEncoder::Clicked) {
-        buttonState = encoder.getButton();
+    int16_t encPos = -1, oldEncPos = -1;
+    int index = 0;
+
+    while (true) {
+        constexpr int infoLength = 4;
+        const String infoItems[infoLength] = {
+            "Reflowduino     ",
+            "By 8lall0       ",
+            "github: 8lall0  ",
+            "License: MIT    ",
+        };
+        encPos += encoder.getValue();
+
+        if (encPos > oldEncPos) {
+            index++;
+        } else if (encPos < oldEncPos) {
+            index--;
+        }
+        oldEncPos = encPos;
+        index = constrain(index, 0, infoLength - 2);
+
+        const uint8_t buttonState = encoder.getButton();
+        lcd.setCursor(0, 0);
+        lcd.print(infoItems[index]);
+        lcd.setCursor(0, 1);
+        lcd.print(infoItems[index + 1]);
+
+        if (buttonState == ClickEncoder::Clicked) {
+            break;
+        }
+
+        delay(500);
     }
 }
 
