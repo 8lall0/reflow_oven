@@ -1,9 +1,11 @@
 #include "Heater.h"
 
-#define PID_SAMPLE_TIME 300
+#define PID_SAMPLE_TIME 1000
 #define KP 300
 #define KI 0.1
 #define KD 200
+
+#define T_ROOM   25.0
 
 #define RREF 430.0
 #define RNOMINAL 100.0
@@ -24,6 +26,7 @@ Heater::Heater(const int pin, hd44780_I2Cexp *screen, Adafruit_MAX31865 *thermoc
 }
 
 void Heater::Start() {
+    lcd->clear();
     while (true) {
         delay(100);
         lcd->setCursor(0, 0);
@@ -70,11 +73,11 @@ void Heater::setTemperature() {
         lcd->print(finalTemperature);
         const uint8_t buttonState = encoder->getButton();
         if (buttonState == ClickEncoder::Clicked) {
+            lcd->clear();
             return;
         }
         temperatureEncoder();
         delay(100);
-        lcd->clear();
     }
 }
 
@@ -89,16 +92,19 @@ void Heater::setTime() {
         lcd->print("> ");
         lcd->print(hour);
         lcd->print(":");
+        if (minute < 10) {
+            lcd->print("0");
+        }
         lcd->print(minute);
         lcd->print(" ");
 
         const uint8_t buttonState = encoder->getButton();
         if (buttonState == ClickEncoder::Clicked) {
+            lcd->clear();
             return;
         }
         timeEncoder();
         delay(100);
-        lcd->clear();
     }
 }
 
@@ -171,6 +177,9 @@ void Heater::startHeat() {
             digitalWrite(ssrPIN, LOW);
             break;
         }
+        setPoint = T_ROOM + (finalTemperature - T_ROOM) * (
+                              static_cast<double>(elapsedPhase) / static_cast<double>(finalTime / 10));
+
         heatPID.Compute();
         if (output > 0 && abs(temperature - setPoint) > 0.2) {
             digitalWrite(ssrPIN, HIGH); // Turn ON heater
@@ -184,10 +193,10 @@ void Heater::startHeat() {
         lcd->print(finalTemperature, 1);
 
 
-        const unsigned int elapsedMinute = elapsedPhase / 60000;
-        const unsigned int elapsedHour = elapsedMinute / 60;
-        const unsigned int toHour = finalTime / 60;
-        const unsigned int toMinute = finalTime % 60;
+        const unsigned long elapsedMinute = elapsedPhase / 60000;
+        const unsigned long elapsedHour = elapsedMinute / 60;
+        const unsigned long toHour = finalTime / 60;
+        const unsigned long toMinute = finalTime % 60;
         lcd->setCursor(0, 1);
         lcd->print("T: ");
         lcd->print(elapsedHour);
@@ -206,6 +215,8 @@ void Heater::startHeat() {
         lcd->print(" ");
         delay(100);
     }
+
+    lcd->clear();
 }
 
 void Heater::stop() {
@@ -220,4 +231,5 @@ void Heater::stop() {
         lcd->print(temperature, 1);
         lcd->print("C");
     }
+    lcd->clear();
 }
