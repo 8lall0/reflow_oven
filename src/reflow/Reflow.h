@@ -21,7 +21,7 @@ private:
     PID reflowPID;
     ClickEncoder *encoder;
 
-    void stop() const;
+    void stop();
 };
 
 #endif //REFLOW_H

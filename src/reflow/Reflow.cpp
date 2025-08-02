@@ -44,12 +44,13 @@ Reflow::Reflow(const int pin, hd44780_I2Cexp *screen, Adafruit_MAX31865 *thermoc
     this->encoder = encoder;
 }
 
-void Reflow::stop() const {
+void Reflow::stop() {
     lcd->clear();
     lcd->setCursor(0, 0);
     lcd->print("Stopping....");
 
     while (temperature > 50.0) {
+        temperature = thermo->temperature(RNOMINAL, RREF);
         lcd->setCursor(0, 1);
         lcd->print("T:");
         lcd->print(temperature, 1);
