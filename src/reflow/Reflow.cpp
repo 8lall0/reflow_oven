@@ -58,9 +58,11 @@ void Reflow::stop() {
         lcd->print(setPoint, 1);
         lcd->print(" ");
     }
+    lcd->clear();
 }
 
 void Reflow::Start() {
+    lcd->clear();
     unsigned long phaseStart = 0;
 
     phase = PHASE_PREHEAT;
